@@ -1,0 +1,93 @@
+---
+- name: Sonar nstallation
+  hosts: localhost
+  tasks:
+  - name: check java1.8 is installed or not
+    shell: readlink -f $(which java)
+    register: java_version
+
+  - name: Download Latest version of sonar 
+    get_url:
+       url: https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-7.6.zip
+       dest: /opt
+    become: yes
+    when: java_version.stdout != ""
+
+  - name : unarchieve sonar
+    unarchive:
+            src: /opt/sonarqube-7.6.zip
+            dest: /opt
+    become: yes  
+
+  - name: change sonar version name into sonar
+    shell: mv /opt/sonarqube-7.6 /opt/sonarqube
+    become: yes
+    ignore_errors: yes
+
+  - name: check user is present or not
+    shell: id -u sonar
+    register: user_detials
+
+  - name: add sonar user
+    user: 
+      name: sonar
+      comment: sonar user  
+    become: yes
+    when: user_detials.stdout != ""
+
+  - name: set permission for sonar user
+    shell: chown -R sonar:sonar /opt/sonarqube     
+    become: yes
+    
+
+  - name: update nexus.rc file
+    lineinfile:
+      path: /opt/sonarqube-7.6/bin/linux-x86-64/sonar.sh
+      regex: ".*RUN_AS_USER.*"
+      line: "RUN_AS_USER=sonar"
+    become: yes   
+
+  - name: start sonar
+    shell: ./sonar.sh start   
+    args: 
+      chdir: /opt/sonarqube/bin/linux-x86-64 
+    become: yes
+    become_method: sudo
+    become_user: sonar
+    #    ignore_errors: yes
+
+  - name: check whether sonar is running or not
+    shell: ./sonar.sh status
+    args:
+      chdir: /opt/sonarqube/bin/linux-x86-64
+    register: sonar_status
+    become: yes
+    become_method: sudo
+    become_user: sonar
+
+
+  - name: edit sonarqube.service file
+    template:
+          src: sonarqube.service
+          dest: /etc/systemd/system  
+    become: yes
+
+  - name: Restart
+    shell: sudo systemctl daemon-reload
+
+  - name: start sonarqube
+    shell: sudo systemctl start sonarqube
+
+  - name: enable sonarqube
+    shell: sudo systemctl enable sonarqube
+
+  - name: wait for 30 seconds
+    wait_for:
+        timeout: 30
+
+  - name: check sonar is running or not
+    shell: sudo systemctl status  sonarqube
+    register: sonar_status  
+          
+
+        
