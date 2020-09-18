@@ -4,6 +4,6 @@ Host : local host
 prerequisites:
 Ansible is needed.
 
-#how to run the code 
+how to run the code 
 
 ansible-playbook sonar_install.yml -vvv
